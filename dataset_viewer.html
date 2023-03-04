@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width initial-scale=1'>
+<title>Dataset viewer</title>
+<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.3/dist/jquery.min.js"></script>
+<script type="text/javascript">
+    const base_url = "https://huggingface.co/datasets/personpi/feimage/resolve/main/";
+    let passwd = "";
+    let current_path = "";
+    let current_manifest = {remote_path: "", default_iv: "", files: [], folders: []};
+
+    const decrypt_aes = (b64key, b64iv, b64ct) => {
+        const key = CryptoJS.enc.Base64.parse(b64key);
+        const iv = CryptoJS.enc.Base64.parse(b64iv);
+        return CryptoJS.AES.decrypt(b64ct, key, { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 });
+    };
+    const convertBlobToBase64 = (blob) => new Promise((resolve, reject) => {
+        const reader = new FileReader;
+        reader.onerror = reject;
+        reader.onload = () => {
+            resolve(reader.result);
+        };
+        reader.readAsDataURL(blob);
+    });
+    const dec_key_iv = (enc_key, enc_iv, def_iv) => {
+        const sha256_pw = CryptoJS.SHA256(passwd).toString(CryptoJS.enc.Base64);
+        const default_iv = btoa(def_iv);
+        const key = decrypt_aes(sha256_pw, default_iv, enc_key).toString(CryptoJS.enc.Base64);
+        const iv = decrypt_aes(sha256_pw, default_iv, enc_iv).toString(CryptoJS.enc.Base64);
+        return [key, iv];
+    };
+    const load_manifest = (manifest_path) => {
+        const manifest_url = base_url + manifest_path;
+        fetch(manifest_url)
+            .then(resp=>resp.json())
+            .then(manifest=>{
+                current_path = manifest_path;
+                current_manifest = manifest;
+                $("#currentpath").text(current_path);
+                $("#filelist").empty();
+                if (manifest_path != "dataset.json" && manifest_path.split("/").length >= 2) {
+                    // get parent folder
+                    const parent_path = manifest_path.split("/").slice(0, -2).join("/");
+                    if (parent_path != "")
+                        manifest.folders = [{name: "..", remote_path: parent_path + "/manifest.json"}, ...manifest.folders]
+                    else
+                        manifest.folders = [{name: "..", remote_path: "dataset.json"}, ...manifest.folders]
+                }
+                manifest.folders.forEach(folder=>{
+                    let li = $("<li></li>");
+                    let a = $("<a></a>");
+                    a.text(folder.name);
+                    a.attr("href", "#");
+                    a.click(() => {
+                        load_manifest(folder.remote_path);
+                    });
+                    li.append(a);
+                    $("#filelist").append(li);
+                });
+
+                manifest.files.forEach(file=>{
+                    let li = $("<li></li>");
+                    let a = $("<a></a>");
+                    a.text(file.name);
+                    a.attr("href", "#");
+                    a.click(() => {
+                        const [key, iv] = dec_key_iv(file.key, file.iv, manifest.default_iv);
+                        load_img(file.remote_path, key, iv);
+                    });
+                    li.append(a);
+                    $("#filelist").append(li);
+                });
+            });
+    };
+    const load_img = (img_path, key, iv) => {
+        const img_url = base_url + img_path;
+        fetch(img_url)
+            .then(resp=>resp.blob())
+            .then(convertBlobToBase64)
+            .then(orig_b64=>{
+                const b64 = orig_b64.split(',')[1];
+                const dec_img_b64 = decrypt_aes(key, iv, b64).toString(CryptoJS.enc.Base64);
+                // Create a Blob from dec_img
+                const blob = new Blob([Uint8Array.from(atob(dec_img_b64), (_) => _.charCodeAt(0))]);
+                // Create a URL from the Blob
+                const url = URL.createObjectURL(blob);
+                // Set the image src to the URL
+                $("#image").attr("src", url);
+            });
+    };
+    $("html").ready(() => {
+        load_manifest("dataset.json");
+        $("#submit_password").click(() => {
+            passwd = $("#password_input").val();
+        });
+    })
+</script>
+</head>
+<body>
+<pre id="currentpath"></pre>
+<div id="forpassword">
+    <input type="password" id="password_input" />
+    <button id="submit_password">Submit</button>
+</div>
+<div id="forfilelist">
+    <ul id="filelist"></ul>
+</div>
+<div id="forimg">
+    <img src="" alt="The image" id="image" style="width: 90%;"></img>
+</div>
+</body>
+</html>
