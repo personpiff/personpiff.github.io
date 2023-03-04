@@ -1,0 +1,51 @@
+<html>
+<head>
+<title>Test Crypto</title>
+<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.3/dist/jquery.min.js"></script>
+</head>
+<body>
+<div id="testing">
+<img src="" alt="Test image"></img>
+</div>
+<script type="text/javascript">
+    const decrypt_aes = (b64key, b64iv, b64ct) => {
+        const key = CryptoJS.enc.Base64.parse(b64key);
+        const iv = CryptoJS.enc.Base64.parse(b64iv);
+        return CryptoJS.AES.decrypt(b64ct, key, { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 });
+    };
+    const convertBlobToBase64 = (blob) => new Promise((resolve, reject) => {
+        const reader = new FileReader;
+        reader.onerror = reject;
+        reader.onload = () => {
+            resolve(reader.result);
+        };
+        reader.readAsDataURL(blob);
+    });
+
+    const passwd = "Examp1e_pw";
+    const default_iv = btoa("deadbeefdeadc0de");
+    
+    const enc_key = "JMwIawmDM9Ke/XixIaCY0lCYRfuY0ERgGjNFzpb+wkQTRImp+NXkJo/cKc4VH/4+"
+    const enc_iv = "T72UDTYqrPMnvWb2P8zu2MLnOyS009t+7iuz4RwXKcI="
+    const sha256_pw = CryptoJS.SHA256(passwd).toString(CryptoJS.enc.Base64);
+    const key = decrypt_aes(sha256_pw, default_iv, enc_key).toString(CryptoJS.enc.Base64);
+    const iv = decrypt_aes(sha256_pw, default_iv, enc_iv).toString(CryptoJS.enc.Base64);
+
+    const img_url = "https://huggingface.co/datasets/personpi/feimage/resolve/main/classic_example.jpg.enc";
+    fetch(img_url)
+        .then(resp=>resp.blob())
+        .then(convertBlobToBase64)
+        .then(orig_b64=>{
+            const b64 = orig_b64.split(',')[1];
+            const dec_img_b64 = decrypt_aes(key, iv, b64).toString(CryptoJS.enc.Base64);
+            // Create a Blob from dec_img
+            const blob = new Blob([Uint8Array.from(atob(dec_img_b64), (_) => _.charCodeAt(0))]);
+            // Create a URL from the Blob
+            const url = URL.createObjectURL(blob);
+            // Set the image src to the URL
+            $("img").attr("src", url);
+        });
+</script>
+</body>
+</html>
