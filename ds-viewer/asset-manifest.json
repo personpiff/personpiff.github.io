@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/ds-viewer/static/css/main.6ff4d272.css",
+    "main.js": "/ds-viewer/static/js/main.6e501a6f.js",
+    "index.html": "/ds-viewer/index.html",
+    "main.6ff4d272.css.map": "/ds-viewer/static/css/main.6ff4d272.css.map",
+    "main.6e501a6f.js.map": "/ds-viewer/static/js/main.6e501a6f.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.6ff4d272.css",
+    "static/js/main.6e501a6f.js"
+  ]
+}
